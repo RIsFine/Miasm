@@ -2,12 +2,19 @@ from recipeIngredient import RecipeIngredient
 from typing import List
 import requests
 from bs4 import BeautifulSoup
+import pandas as pd
 
 
 class Recipe:
-    def __init__(self, url: str):
-        self.url = url
-        self.ingredients = self.get_ingredients()
+    def __init__(self, recipe: pd.Series):
+        self.url = recipe["url"]
+        self.price_est = recipe["price estimation"]
+        self.time_prep = recipe["time prep"]
+        self.time_cook = recipe["time cook"]
+        self.time_rest = recipe["time rest"]
+        self.ingredients = recipe["ingredients"]
+        self.quantities = recipe["quantities"]
+        self.kcal = recipe["kcal per portion"]
 
     def get_ingredients(self) -> List[RecipeIngredient]:
         if hasattr(self, "ingredients"):
@@ -26,6 +33,9 @@ class Recipe:
         # ingredients = soup.find('div', class_='jow_prod__sc-71781f57-4 dXFCtp')
         dico = dict(zip(ingredients, quantities))
         print(dico)
+
+    def get_components(self) -> dict:
+        """ Maps the ingredients of the recipe with components (fruits, starch ..)"""
 
 
 if __name__ == "__main__":
