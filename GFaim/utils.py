@@ -8,7 +8,6 @@ import pandas as pd
 from scipy.spatial.distance import jaccard
 from nltk.tokenize import word_tokenize
 from nltk.stem import SnowballStemmer
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 ingredient_categories = {
     'Viandes': ['bœuf', 'pancetta', 'lardons', 'jambon', 'saucisse', 'rosette', 'canard', 'poulet', 'chorizo', 'saumon',
@@ -22,7 +21,7 @@ ingredient_categories = {
                 'courge', 'radis', 'poivron', 'maïs', 'fenouil', 'céleri-rave', 'oignons', 'poivrons', 'endives',
                 'betterave', 'petits pois', 'asperges', 'chou', 'carottes', 'navet', 'panais', 'artichaut', 'olive',
                 'ratatouille', 'asperge', 'rhubarbe', 'topinambour', 'cresson', 'céleri', 'oignons', 'laitue',
-                'cerfeuil', 'sauge', 'orzo', 'taboulé', 'spätzle', 'macédoine', 'choucroute'],
+                'cerfeuil', 'sauge', 'orzo', 'taboulé', 'spätzle', 'macédoine', "légumes"],
 
     'Fruits': ['citron', 'nectarine', 'fraise', 'figue', 'mangue', 'grenade', 'orange', 'pomme', 'marrons', 'melon',
                'abricot', 'poire', 'compote', 'pastèque', 'cerises', 'fruits', 'pamplemousse', 'mirabelle', 'banane',
@@ -31,7 +30,7 @@ ingredient_categories = {
 
     'Graines': ['noisette', 'graines', 'pignons', 'noix', 'amandes', 'cacahuète', 'pistaches', 'amande', 'boulgour'],
 
-    'Patisseries': ['chapelure', 'biscotte', 'pain', 'sucre', 'levure', 'chocolat', 'vanille', 'cacao',
+    'Patisseries': ['biscotte', 'pain', 'sucre', 'levure', 'chocolat', 'vanille', 'cacao', "pâte à tartiner",
                     'speculoos', 'meringue', 'biscuit', "fleur d'oranger", 'crêpes', 'brioche', 'galettes', 'bonbons'],
 
     'Laitages': ['fromage', 'reblochon', 'emmental', 'gorgonzola', 'crème', 'mozzarella', 'œuf', 'parmesan', 'feta',
@@ -43,10 +42,11 @@ ingredient_categories = {
                               'maquereau', 'sardine', 'crabe', 'nem', 'poisson', 'lieu', 'algues', 'huître', 'surimi',
                               'moules'],
 
-    'Féculents': ['riz', 'gnocchi', 'lentilles', 'lasagnes', 'pâtes', 'farine', 'maïzena', 'frites', 'galette', 'pâte',
+    'Féculents': ['chapelure', 'riz', 'gnocchi', 'lentilles', 'lasagnes', 'pâtes', 'farine', 'maïzena', 'frites',
+                  'galette', 'pâte',
                   'quinoa', 'polenta', 'ravioles', 'tortilla', 'semoule', 'vermicelles', 'couscous', 'udon', 'blé',
                   'patate', 'nouilles', 'quenelle', 'avoine', 'ravioli', 'blinis', 'crozets', 'vol-au-vent', 'falafel',
-                  'purée', 'ramen', 'potatoes', 'fajitas', 'spätzle', 'orzo', 'risotto', 'taboulé'],
+                  'purée', 'ramen', 'potatoes', 'fajitas', 'spätzle', 'orzo', 'risotto', 'taboulé', 'pommes de terre'],
 
     'Épices': ['curry', 'origan', 'tabasco', 'chili', 'coriandre', 'espelette', 'thym', 'basilic', 'gingembre', 'cumin',
                'persil', 'piment', 'herbes', 'estragon', 'paprika', 'curcuma', 'quatre-épices', 'romarin', 'garam',
@@ -64,17 +64,15 @@ ingredient_categories = {
                'guimauve', 'tapenade', 'gélatine', 'cracker', 'blanc', 'filet', 'œufs', 'colorants', 'bonbons']
 }
 
+meal_names = ["bao", "saumon", "butternut", "gratin", "courge", "soupe", "velouté", "wok",
+              "feta", "poêlée", "aubergine", "omelette", "bruschetta", "taboulé", "fondue", "chou-fleur", "frittata",
+              "poireaux", "brick", "bouillon", "sandwich"]
 
-dessert_ingredients = ["Chocolat", "Sucre", "Farine", ]
-meal_ingredients = ["Frites", "Bœuf", "viande", "Viande", "Oignon", "Poulet", "Ravioles", "Nem",
-                    "Légumes", "Pâtes", "Pommes de terre", "Potatoes", "Salade", "Tomates", "Escalope",
-                    "escalope", "Brocoli", "Haricot", "Courgette", "Épinards", "Cabillaud", "Aubergine"]
-
-meal_names = ["Steak", "Légumes"]
-
-recipes_without = ["Champignons"]
-
-most_valuable_ingredients = [""]
+not_meal_names = ["pie", "cake aux épices", "clafoutis", "crumble", "tarte", "pâte", "chocolat", "gâteau", "ookie",
+                  "cocktail", "pizza", "toast", "tartines", "pâte brisée", "pâte à tarte", "pâte sablée" "barres",
+                  "shortbreads", "galette des rois", "hot dog", "financier", "lasagnes express", "galette de sarrasin",
+                  "blinis", "planche", "biscuits", "pâte à tartiner", "prunes", "cake aux pommes",
+                  "crème de feta & miel"]
 
 
 def run(url, features) -> BeautifulSoup:
@@ -98,7 +96,8 @@ def run_sitemap():
 
 def get_price(soup: BeautifulSoup):
     try:
-        price = soup.find("div", class_="jow_prod__sc-4ec11422-1 cSLrYS")  # Update class_name to the actual class name
+        price = soup.find("div", class_="jow_prod__sc-4ec11422-1 cSLrYS")
+        # Update class_name to the actual class name
         if price:
             return price.get("title")
         else:
@@ -177,7 +176,7 @@ def get_all(link):
     return pd.DataFrame(dico)
 
 
-def main():
+def csv_from_sitemap():
     start_time = t.time()
     print(f"start: {start_time}")
 
@@ -248,48 +247,5 @@ recipe2_ingredients = {'flour', 'sugar', 'vanilla', 'eggs'}
 
 if __name__ == "__main__":
     recipes = pd.read_csv("recipes.csv", sep=";")
-    df = reformat_cols(recipes)
-    names = []
-    """
-    for name in df["name"]:
-        names.append(word_tokenize(name, language="french")[0])
-    """
-    print(f"shape: {df.shape}")
-    current = recipes['ingredients'].iloc[0]
-    all = []
-    for i, ingredients in enumerate(df["ingredients"]):
-        all += [ing.lower().split()[0] for ing in ingredients if ing.lower().split()[0] not in all]
-        for ing in ingredients:
-            words = word_tokenize(ing, language="french")
-        name = df["name"].iloc[i]
-        print(f"\n{name}, ingredients: {ingredients}")
-        # print(f"test : {[get_first_words(ing) for ing in ingredients]}")
-        is_meal = False
-        current = ingredients
-        for ing in meal_ingredients:
-            if not is_meal and any(ing in ingredient for ingredient in ingredients):
-                is_meal = True
-
-        if is_meal:
-            print("Meal")
-    print(all)
-    print(len(all))
-    """
-        for ing in dessert_ingredients:
-            if any(ing in ingredient for ingredient in ingredients):
-                print(f"Dessert")"""
-
-    """vectorizer = TfidfVectorizer()
-    X = vectorizer.fit_transform(names)
-    tokens = vectorizer.get_feature_names_out()
-    tokenizer = vectorizer.build_tokenizer()
-    analyzer = vectorizer.build_analyzer()
-    preprocessor = vectorizer.build_preprocessor()
-    print(analyzer(df["name"].iloc[0]))
-    print(df['name'].iloc[0])
-    # print(vectorizer.decode(all))
-    for token in tokens:
-        print(token)"""
-    """for ingredients in df["ingredients"]:
-        print(f"tokenized:{[tokenizer(ing) for ing in ingredients]}")"""
+    print(recipes["ingredients"])
 
