@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/GFaim.iml" filepath="$PROJECT_DIR$/.idea/GFaim.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../Miasm/.idea/Miasm.iml" filepath="$PROJECT_DIR$/../Miasm/.idea/Miasm.iml" />
     </modules>
   </component>
 </project>
