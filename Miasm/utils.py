@@ -1,13 +1,11 @@
-import nltk
+from typing import List
 from bs4 import BeautifulSoup
 import requests
 from urllib.parse import urlparse
 import concurrent.futures
 import time as t
 import pandas as pd
-from scipy.spatial.distance import jaccard
-from nltk.tokenize import word_tokenize
-from nltk.stem import SnowballStemmer
+from math import isnan
 
 ingredient_categories = {
     'Viandes': ['bœuf', 'pancetta', 'lardons', 'jambon', 'saucisse', 'rosette', 'canard', 'poulet', 'chorizo', 'saumon',
@@ -74,6 +72,8 @@ not_meal_names = ["pie", "cake aux épices", "clafoutis", "crumble", "tarte", "p
                   "blinis", "planche", "biscuits", "pâte à tartiner", "prunes", "cake aux pommes",
                   "crème de feta & miel"]
 
+to_ban = ["champignons", "crevette", "asperges"]
+
 
 def run(url, features) -> BeautifulSoup:
     response = requests.get(url)
@@ -107,7 +107,7 @@ def get_price(soup: BeautifulSoup):
         return None
 
 
-def get_time(soup: BeautifulSoup, class_: str = None):
+def get_time(soup: BeautifulSoup):
     # soup = run(recipe, "html.parser")
     desc = soup.find_all(class_="jow_prod__sc-ba7286dc-1 hPfiNz")
     """if not desc:
@@ -194,58 +194,67 @@ def csv_from_sitemap():
     print(f"process duration: {end - start_time}")
 
 
-def reformat_cols(df):
+def reformat_df(df):
 
     def splitting(value):
         return value.split("'")[1::2]
     df["ingredients"] = df["ingredients"].map(splitting)
     df["quantities"] = df["quantities"].map(splitting)
 
+    def minutes_conversion(time):
+        if isinstance(time, float) and isnan(time):
+            return 0
+
+        if "heure" in time:
+            return float(time[0])*60
+        return float(time[0])
+
+    df["time prep"] = df["time prep"].map(minutes_conversion)
+    df["time cook"] = df["time cook"].map(minutes_conversion)
+    df["time rest"] = df["time rest"].map(minutes_conversion)
+
+    def remove_parenthesis_spec(ingredients: List[str]):
+        new = []
+        for ingredient in ingredients:
+
+            if "(" in ingredient:
+                new.append(ingredient[:ingredient.index("(")].strip())
+            elif "érable" in ingredient:
+                new.append("sirop d'érable")
+            elif "," in ingredient or "[" in ingredient or "]" in ingredient:
+                continue
+            else:
+                new.append(ingredient)
+        return new
+    df["ingredients"] = df["ingredients"].map(remove_parenthesis_spec)
+
+    def kcal_to_float(kcal: str):
+        return float(kcal[:kcal.index("kcal")])
+    df["kcal per portion"] = df["kcal per portion"].map(kcal_to_float)
+
     return df
 
 
-def get_first_words(ingredient):
-    tokens = word_tokenize(ingredient.lower(), language="french")
-    # print(tokens)
-    # tagged = nltk.binary_distance()
-    # print(tagged)
-    stemmed_tokens = [SnowballStemmer("french").stem(token) for token in tokens]
-    # print(stemmed_tokens)
-    ingredient_key = ' '.join(stemmed_tokens)
-    return ingredient_key
+def kcal_need_f(poids, taille, age, coeff=1.2):
+    # source : https://www.santemagazine.fr/alimentation/acheter-et-cuisiner/
+    # repas-equilibre/comment-calculer-vos-besoins-journaliers-en-calories-267433
+    # 1.2 : peu/pas actif
+    # 1.375 : exerice 1 à 3 fois par semaine
+    # 1.55 : exercice 4 à 6 fois par semaine
+    # 1.725 : exercice quotidien
+    return (9.740*poids + 172.9*taille - 4.737*age + 667.051)*coeff
 
 
-def get_matrix(df: pd.DataFrame):
-    pass
+def kcal_need_h(poids, taille, age, coeff=1.2):
+    return (13.707*poids + 492.3*taille - 6.673*age + 77.607)*coeff
 
 
-def jaccard_distance(list1, list2):
-    l1 = []
-    l2 = []
-    i = 0
-    while i < len(list1) and i < len(list2):
-        if i < len(list1):
-            l1 += word_tokenize(list1[i], language="french")
-        if i < len(list2):
-            l2 += word_tokenize(list2[i], language="french")
-        i += 1
-
-    print(f"l1: {l1}")
-    print(f"l2: {l2}")
-    return nltk.jaccard_distance(set(l1), set(l2))
+def kcal_need_ch():
+    return 1300
 
 
-# Example ingredient sets for two recipes
-recipe1_ingredients = {'flour', 'sugar', 'butter', 'eggs'}
-recipe2_ingredients = {'flour', 'sugar', 'vanilla', 'eggs'}
-
-# Compute Jaccard distance
-# distance = jaccard_distance(recipe1_ingredients, recipe2_ingredients)
-
-# print("Jaccard Distance:", distance)
+besoin_kcal = kcal_need_h(59, 1.63, 24) + kcal_need_f(55, 1.56, 24) + kcal_need_ch()/2
 
 
 if __name__ == "__main__":
-    recipes = pd.read_csv("recipes.csv", sep=";")
-    print(recipes["ingredients"])
-
+    pass

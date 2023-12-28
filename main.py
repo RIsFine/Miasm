@@ -1,9 +1,12 @@
+import numpy as np
+
+from Miasm.mealPlan import MealPlan
 from Miasm.utils import *
 from Miasm.recipe import Recipe
 
 
 def get_final_recipes():
-    recipes = reformat_cols(pd.read_csv("recipes.csv", sep=";"))
+    recipes = reformat_df(pd.read_csv("recipes.csv", sep=";"))
     list_meal = []
     list_not_meal = []
 
@@ -44,8 +47,29 @@ def get_final_recipes():
     recipes_final.to_csv("recipes_final.csv", header=True, sep=";", columns=recipes.columns)
 
 
+def score(meal_n: Recipe, previous: Recipe, tps_dipo: float, besoin_j: float):
+    p = meal_n.price_max()
+    j = meal_n.jaccard(previous)
+    kcal = (previous.kcal + meal_n.kcal) / besoin_j
+    t = meal_n.total_time() / tps_dipo
+
+    return j*(0.1/abs(1-t) + 0.5/p + 0.4/abs(1-kcal))
+
+
 if __name__ == "__main__":
-    recipes = reformat_cols(pd.read_csv("recipes_final.csv", sep=";"))
-    for i in range(recipes.shape[0]):
-        recipe = recipes.iloc[i]
-        print(f'{recipe["name"]}, {recipe["ingredients"]}')
+    recipes = reformat_df(pd.read_csv("recipes_final.csv", sep=";"))
+    current = Recipe(recipes.iloc[0])
+    # l = []
+    # for i in range(recipes.shape[0]):
+    #     recipe = Recipe(recipes.iloc[i])
+    #     l.append(recipe)
+    #     print(f'{recipe.name} -> time total: {recipe.jaccard_components(current)}, ing: {recipe.jaccard_ingredients(current)}'
+    #           f', jaccard: {recipe.jaccard(current)}, score: {score(recipe, current, 60, besoin_kcal)}')
+    #     current = recipe
+    l = list(map(lambda i: Recipe(recipes.iloc[i]), range(recipes.shape[0])))
+    plan = MealPlan(None, None, l, 60, 22)
+    mat = plan.transition_matrix
+    print(np.max(mat))
+    print(plan.price()*3)
+
+    pass
