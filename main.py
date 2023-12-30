@@ -47,17 +47,10 @@ def get_final_recipes():
     recipes_final.to_csv("recipes_final.csv", header=True, sep=";", columns=recipes.columns)
 
 
-def score(meal_n: Recipe, previous: Recipe, tps_dipo: float, besoin_j: float):
-    p = meal_n.price_max()
-    j = meal_n.jaccard(previous)
-    kcal = (previous.kcal + meal_n.kcal) / besoin_j
-    t = meal_n.total_time() / tps_dipo
-
-    return j*(0.1/abs(1-t) + 0.5/p + 0.4/abs(1-kcal))
-
-
 if __name__ == "__main__":
-    recipes = reformat_df(pd.read_csv("recipes_final.csv", sep=";"))
+    df = pd.read_csv("recipes_final.csv", sep=";")
+    df
+    recipes = reformat_df(df)
     current = Recipe(recipes.iloc[0])
     # l = []
     # for i in range(recipes.shape[0]):
@@ -67,9 +60,26 @@ if __name__ == "__main__":
     #           f', jaccard: {recipe.jaccard(current)}, score: {score(recipe, current, 60, besoin_kcal)}')
     #     current = recipe
     l = list(map(lambda i: Recipe(recipes.iloc[i]), range(recipes.shape[0])))
-    plan = MealPlan(None, None, l, 60, 22)
-    mat = plan.transition_matrix
-    print(np.max(mat))
+
+    print("\nHiver")
+    plan = MealPlan(None, None, l, 60, 22, season="hiver")
     print(plan.price()*3)
+
+    print("\nPrintemps")
+    plan1 = MealPlan(None, None, l, 60, 22, season="printemps")
+    print(plan1.price()*3)
+
+    print("\nEte")
+    plan2 = MealPlan(None, None, l, 60, 22, season="ete")
+    print(plan2.price()*3)
+
+    print("\nAutomne")
+    plan3 = MealPlan(None, None, l, 60, 22, season="automne")
+    print(plan3.price()*3)
+    # mat = plan.compute_matrix()
+    # plan.transition_matrix = mat
+    # plan.generate()
+    # print(f"max trans matrix: {np.max(mat)}, mean: {np.mean(mat)}, std: {np.std(mat)}")
+    # print(plan.price()*3)
 
     pass
