@@ -11,7 +11,7 @@ ingredient_categories = {
     'Viandes': ['bœuf', 'pancetta', 'lardons', 'jambon', 'saucisse', 'rosette', 'canard', 'poulet', 'chorizo', 'saumon',
                 'veau', 'lard', 'chair à saucisse', 'dinde', 'bacon', 'boudin', 'foie', 'porc', 'merguez', 'steak',
                 'nuggets', 'coppa', 'rillettes', 'côte', 'gésiers', 'aligot', 'agneau', 'escalope',
-                'pintade', 'chapon', 'rôti', 'hachis parmentier'],
+                'pintade', 'chapon', 'rôti'],
 
     'Légumes': ['cornichon', 'épinard', 'tomate', 'ail', 'oignon', 'carotte', 'courgette', 'champignons', 'haricots',
                 'échalote', 'haricot', 'salade', 'nectarine', 'artichauts', 'burrata', 'menthe', 'fraise', 'aubergine',
@@ -70,9 +70,33 @@ not_meal_names = ["pie", "cake aux épices", "clafoutis", "crumble", "tarte", "p
                   "cocktail", "pizza", "toast", "tartines", "pâte brisée", "pâte à tarte", "pâte sablée" "barres",
                   "shortbreads", "galette des rois", "hot dog", "financier", "lasagnes express", "galette de sarrasin",
                   "blinis", "planche", "biscuits", "pâte à tartiner", "prunes", "cake aux pommes",
-                  "crème de feta & miel"]
+                  "crème de feta & miel", "pancake"]
 
-to_ban = ["champignons", "crevette", "asperges"]
+to_ban = ["champignon", "crevette", "asperge", "anchois"]
+
+
+seasons = {"ete": ['tomate', 'courgette', 'artichaut', 'menthe', 'fraise', 'aubergine', 'avocat', 'concombre',
+                   'poivron', 'fenouil', 'olive', 'ratatouille', 'taboulé', 'salade'
+                   ],
+
+           "automne": ['potimarron', 'courge ', 'navet', 'panais', 'artichaut', "citrouille", "blette", "butternut",
+                       "potiron", "rutabaga", "salsifi", "fenouil", "echalote", "cardon", 'champignon'
+                       ],
+
+           "hiver": ['champignon', 'échalote', "soupe", "mâche", "épinard", "courge ", "butternut",
+                     "potimarron", "topinambour", "panais", "crosne", "navet", "potiron",
+                     "rutabaga", "salsifi"
+                     ],
+
+           "printemps": ["artichaut", "épinard", "blette", "concombre", "navet", "pois",
+                         "courgette", "aubergine"
+                         ],
+
+           "toute_saison": ['ail', 'oignon', 'carotte', 'cornichon', 'haricot', 'brocoli', 'maïs', "pomme de terre",
+                            'endive', 'rhubarbe', 'cresson', 'céleri', 'laitue', 'cerfeuil', 'sauge', 'asperge',
+                            'orzo', 'spätzle', 'macédoine', 'légumes' "chou", "radis", 'betterave', 'poireau'
+                            ]
+}
 
 
 def run(url, features) -> BeautifulSoup:
@@ -204,7 +228,6 @@ def reformat_df(df):
     def minutes_conversion(time):
         if isinstance(time, float) and isnan(time):
             return 0
-
         if "heure" in time:
             return float(time[0])*60
         return float(time[0])
@@ -254,6 +277,12 @@ def kcal_need_ch():
 
 
 besoin_kcal = kcal_need_h(59, 1.63, 24) + kcal_need_f(55, 1.56, 24) + kcal_need_ch()/2
+
+
+def names(recipes: pd.DataFrame):
+
+    names = recipes["name"].map(lambda s: s.split()[0])
+    return names.unique()
 
 
 if __name__ == "__main__":
