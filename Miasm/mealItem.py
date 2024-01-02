@@ -1,13 +1,9 @@
-from ingredient import Ingredient
-from typing import List
+from datetime import datetime
+from .recipe import Recipe
 
 
 class MealItem:
 
-    def __init__(self, name: str, category: str, ingredients: List[Ingredient],
-                 day: str):
-        self.name = name
-        self.url
-        self.category = category
-        self.ingredients = ingredients
-
+    def __init__(self, recipe: Recipe, date: datetime):
+        self.recipe = recipe
+        self.date = date

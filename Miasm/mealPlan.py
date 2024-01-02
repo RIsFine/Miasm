@@ -2,66 +2,83 @@ import os.path
 from typing import List
 
 import numpy as np
-import pandas as pd
+from datetime import datetime, timedelta
 
+from ics.grammar.parse import ContentLine
+
+from .mealItem import MealItem
 from .recipe import Recipe
 from .utils import besoin_kcal, to_ban, seasons
+
+from ics import Calendar, Event
+# from icalendar import Calendar, Event
 
 
 class MealPlan:
 
-    def __init__(self, start_date, end_date, recipes: List[Recipe], time_disp: float, num_days: int, season: str):
-        self.start_date = start_date
-        self.end_date = end_date
+    def __init__(self, recipes: List[Recipe], time_disp: float, num_days: int, season: str):
+        self.meals = None
         self.recipes = recipes
         self.time_disp = time_disp  # List of time disponibility
         self.num_days = num_days
         self.season = season
         self.transition_matrix = self.get_matrix()
-        self.sequence = self.generate()
 
-    def get_number_of_days(self) -> int:
-        pass
+    def generate(self, start_date: str, end_date: str, ignore_weekends: bool = False) -> List[MealItem]:
 
-    def generate(self):
-        n = len(self.recipes)
-        i = np.random.randint(n)
-        matrix = self.get_matrix().copy()
+        def update_mat(k, mat):
+            # Update function of transition matrix: each time we choose a recipe, we don't want to have this recipe
+            # twice in the meal plan, so we make the probabilities to get the recipe go down to zero.
+            values = mat[:, k]
+            values.shape = (n, 1)
 
-        def update_mat(k):
-            values = matrix[:, k]
-            zero_values = np.sum(matrix == 0, axis=1)
-            updated = matrix.copy()
+            updated = mat.copy()
             updated[:, k] = 0
-            # updated[k] = 0
 
-            def update_row(j):
-                a = updated[j] + values[j]/(n-zero_values[j])*(updated[i] != 0)
-                print(f"j: {j}, before:{np.sum(updated[j])}, after:{np.sum(a)}")
-                return a
-            final = np.array(list(map(update_row, range(n))))
-            for j in range(n):
-                print(f"j: {j}, {np.sum(final[j])}")
+            zero_values = np.sum(updated == 0, axis=1)
+            zero_values.shape = (n, 1)
+
+            final = updated + (1/(n-zero_values))*values*(updated != 0)
             return final
 
-        matrix = update_mat(i)
+        n = len(self.recipes)
+        i = np.random.randint(n)
 
-        meal_sequence = [self.recipes[i]]
+        matrix = update_mat(i, self.get_matrix().copy())
 
-        for _ in range(self.num_days - 1):
-            # print(f"somme: {np.sum(matrix[i])}")
-            print(self.recipes[i].name)
+        date = datetime.fromisoformat(start_date)
+        date_end = datetime.fromisoformat(end_date)
+        meal_sequence = [MealItem(self.recipes[i], date)]
+
+        while date < date_end:
+            print(f"{self.recipes[i].name}, {date.isoformat()}, {self.recipes[i].url}")
             i = np.random.choice(range(n), p=matrix[i])
-            meal_sequence.append(self.recipes[i])
-            matrix = update_mat(i)
+            date += timedelta(days=1)
+            if ignore_weekends:
+                while 5 <= date.isoweekday() <= 6:
+                    date += timedelta(days=1)
+            meal_sequence.append(MealItem(self.recipes[i], date))
+            matrix = update_mat(i, matrix)
+
+        self.meals = meal_sequence
 
         return meal_sequence
 
-    def price(self):
-        return sum([recipe.price_max() for recipe in self.sequence])
+    def price(self) -> float:
+        return sum([meal.recipe.price_max() for meal in self.meals])
 
-    def to_icls(self):
-        pass
+    def to_ics(self, filename: str):
+        if self.meals is None:
+            raise TypeError("Attribute meals is not defined, you have to use the generate() function first.")
+
+        c = Calendar()
+        for meal in self.meals:
+            e = Event(name="Repas", begin=meal.date)
+            e.description = meal.recipe.name + "\n\n" + meal.recipe.url
+            c.events.add(e)
+
+        with open(filename, 'w') as f:
+            f.writelines(c.serialize_iter())
 
     def score(self, i: int, j: int):
         new_meal = self.recipes[j]
