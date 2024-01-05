@@ -7,6 +7,13 @@ import time as t
 import pandas as pd
 from math import isnan
 
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+
 ingredient_categories = {
     'Viandes': ['bœuf', 'pancetta', 'lardons', 'jambon', 'saucisse', 'rosette', 'canard', 'poulet', 'chorizo', 'saumon',
                 'veau', 'lard', 'chair à saucisse', 'dinde', 'bacon', 'boudin', 'foie', 'porc', 'merguez', 'steak',
@@ -162,13 +169,6 @@ def get_ingredients(soup: BeautifulSoup):
     return ingredients, quantities
 
 
-def get_all_links():
-
-    url = "https://jow.fr/site-map"
-    soup = run(url, "html.parser")
-    return soup.find_all("a")
-
-
 def get_all(link):
     dico = {"url": [], "name": [], "price estimation": [], "time prep": [], "time cook": [], "time rest": [],
             "kcal per portion": [], "ingredients": [], "quantities": []}
@@ -283,6 +283,102 @@ def names(recipes: pd.DataFrame):
 
     names = recipes["name"].map(lambda s: s.split()[0])
     return names.unique()
+
+
+def connection(url, username, password, *driver_options):
+    """ Create a selenium WebDriver, gets to url and connects with account. """
+
+    options = Options()
+    for arg in driver_options:
+        options.add_argument(arg)
+    driver = webdriver.Firefox(options=options)
+    driver.get(url)
+
+    # refusing cookies
+    driver.find_element("xpath", "//button[@class='jow_prod__sc-ba011d79-6 expDro']").click()
+
+    # bouton connection
+    connection_button = "//button[@class='jow_prod__sc-d06221bd-14 gbKUaR']"
+
+    # selection intermarché
+    intermarche = "//div[@class='jow_prod__sc-a187e7c-0 grXkOd jow_prod__sc-d216edd-2 jdTOOB'][2]"
+
+    # accepter les condtions d'utilisations
+    accept_conditions = "//button[@class='jow_prod__sc-2e941d1e-7 jow_prod__sc-2e941d1e-8 gChOlU kJypop']"
+
+    # bouton connection intermarché
+    intermarche_connection_button = "//button[@class='jow_prod__sc-fa79f5b3-2 hezbgj jow_prod__sc-7a4b48cb-2 hXUYpM']"
+
+    driver.find_element("xpath", connection_button).click()
+    WebDriverWait(driver, 10).until(lambda x: x.find_element("xpath", intermarche))
+    driver.find_element("xpath", intermarche).click()
+    driver.find_element("xpath", accept_conditions).click()
+    driver.find_element("xpath", intermarche_connection_button).click()
+
+    # Wait for the new window to open (adjust the timeout as needed)
+    WebDriverWait(driver, 10).until(lambda instance: len(instance.window_handles) > 1)
+
+    # Switch to the new window handle
+    new_window_handle = [handle for handle in driver.window_handles if handle != driver.current_window_handle][0]
+    jow = driver.current_window_handle
+    driver.switch_to.window(new_window_handle)
+    WebDriverWait(driver, 10).until(lambda instance: instance.current_url != 'about:blank')
+
+    username_field_loc = "//input[@id='username_display']"
+    password_field_loc = "//input[@id='password']"
+    login = "//input[@id='kc-login']"
+
+    WebDriverWait(driver, 10).until(lambda x: x.find_element("xpath", username_field_loc))
+
+    username_field = driver.find_element("xpath", username_field_loc)
+    username_field.send_keys(username)
+    password_field = driver.find_element("xpath", password_field_loc)
+    password_field.send_keys(password)
+
+    driver.find_element("xpath", login).click()
+    driver.switch_to.window(jow)
+    WebDriverWait(driver, 10).until(lambda x: len(x.window_handles) == 1)
+    return driver
+
+
+def add_to_menu(driver: webdriver.Firefox, recipe_url: str):
+    driver.get(recipe_url)
+    add_button = "//button[@class='jow_prod__sc-fa79f5b3-2 dKrja-D jow_prod__sc-fad4366c-2 hsurVL']"
+    driver.find_element("xpath", add_button).click()
+
+    add_anyway_button = "//button[@class='jow_prod__sc-111342c9-8 ixsifS']"
+
+    check_for_unavailability(driver, add_anyway_button)
+
+    # Attendre jusqu'à ce que le bouton "retirer du menu" apparaisse
+    withdraw_button = "//button[@class='jow_prod__sc-fa79f5b3-2 dKrja-D jow_prod__sc-fad4366c-2 jow_prod__sc-fad4366c-3 hsurVL Oaxam']"
+    WebDriverWait(driver, 10).until(lambda x: driver.find_element("xpath", withdraw_button))
+
+
+def check_for_unavailability(driver, element):
+
+    try:
+        # Use an explicit wait for the ingredient availability window
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, element)))
+
+        # If the window is found, handle the case where ingredients are not available
+        print("Ingredients unavailability window found!")
+        # Add your logic to handle the case where ingredients are not available
+        driver.find_element(By.XPATH, element).click()
+
+    except TimeoutException:
+        # If the window is not found within the specified time, proceed with normal flow
+        # print("Ingredients unavailability window not found. Proceeding with normal flow.")
+        # Add your logic for the case where ingredients are available
+        return
+
+    except NoSuchElementException:
+        # Handle the case where the element is not found at all
+        print("Element not found. Handle this case accordingly.")
+        # Add your logic for the case where the element is not found at all
+        return
+
+    # Continue with the rest of your script
 
 
 if __name__ == "__main__":

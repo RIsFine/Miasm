@@ -4,27 +4,23 @@ from typing import List
 import numpy as np
 from datetime import datetime, timedelta
 
-from ics.grammar.parse import ContentLine
-
 from .mealItem import MealItem
 from .recipe import Recipe
 from .utils import besoin_kcal, to_ban, seasons
 
 from ics import Calendar, Event
-# from icalendar import Calendar, Event
 
 
 class MealPlan:
 
-    def __init__(self, recipes: List[Recipe], time_disp: float, num_days: int, season: str):
+    def __init__(self, recipes: List[Recipe], time_disp: float, season: str):
         self.meals = None
         self.recipes = recipes
         self.time_disp = time_disp  # List of time disponibility
-        self.num_days = num_days
         self.season = season
         self.transition_matrix = self.get_matrix()
 
-    def generate(self, start_date: str, end_date: str, ignore_weekends: bool = False) -> List[MealItem]:
+    def generate(self, start_date: datetime, end_date: datetime, ignore_weekends: bool = False) -> List[MealItem]:
 
         def update_mat(k, mat):
             # Update function of transition matrix: each time we choose a recipe, we don't want to have this recipe
@@ -45,19 +41,16 @@ class MealPlan:
         i = np.random.randint(n)
 
         matrix = update_mat(i, self.get_matrix().copy())
+        meal_sequence = [MealItem(self.recipes[i], start_date)]
 
-        date = datetime.fromisoformat(start_date)
-        date_end = datetime.fromisoformat(end_date)
-        meal_sequence = [MealItem(self.recipes[i], date)]
-
-        while date < date_end:
-            print(f"{self.recipes[i].name}, {date.isoformat()}, {self.recipes[i].url}")
+        while start_date < end_date:
+            print(f"{self.recipes[i].name}, {start_date.isoformat()}, {self.recipes[i].url}")
             i = np.random.choice(range(n), p=matrix[i])
-            date += timedelta(days=1)
+            start_date += timedelta(days=1)
             if ignore_weekends:
-                while 5 <= date.isoweekday() <= 6:
-                    date += timedelta(days=1)
-            meal_sequence.append(MealItem(self.recipes[i], date))
+                while 5 <= start_date.isoweekday() <= 6:
+                    start_date += timedelta(days=1)
+            meal_sequence.append(MealItem(self.recipes[i], start_date))
             matrix = update_mat(i, matrix)
 
         self.meals = meal_sequence

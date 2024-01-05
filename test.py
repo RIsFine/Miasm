@@ -1,67 +1,120 @@
-from nltk.tokenize import word_tokenize
-from nltk.stem import PorterStemmer, SnowballStemmer
-from sklearn.feature_extraction.text import TfidfVectorizer
+from selenium import webdriver
+from selenium.common import TimeoutException, NoSuchElementException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.support import expected_conditions as EC
+
+from selenium.webdriver.support.wait import WebDriverWait
 
 
-def get_most_important_words(tokens, num_words=5):
-    # Convert the list of tokens into a string
-    text = ' '.join(tokens)
+def connection(url):
 
-    # Create a TfidfVectorizer
-    vectorizer = TfidfVectorizer()
+    options = Options()
+    # options.add_argument("--headless")
+    driver = webdriver.Firefox(options=options)
+    driver.get(url)
 
-    # Fit and transform the text
-    tfidf_matrix = vectorizer.fit_transform([text])
+    # refusing cookies
+    driver.find_element("xpath", "//button[@class='jow_prod__sc-ba011d79-6 expDro']").click()
 
-    # Get feature names (words)
-    feature_names = vectorizer.get_feature_names_out()
+    # bouton connection
+    connection_button = "//button[@class='jow_prod__sc-d06221bd-14 gbKUaR']"
 
-    # Get the TF-IDF scores for each word
-    tfidf_scores = tfidf_matrix.toarray()[0]
+    # selection intermarché
+    intermarche = "//div[@class='jow_prod__sc-a187e7c-0 grXkOd jow_prod__sc-d216edd-2 jdTOOB'][2]"
 
-    # Create a dictionary mapping each word to its TF-IDF score
-    word_scores = dict(zip(feature_names, tfidf_scores))
-    print(word_scores)
+    # accepter les condtions d'utilisations
+    accept_conditions = "//button[@class='jow_prod__sc-2e941d1e-7 jow_prod__sc-2e941d1e-8 gChOlU kJypop']"
 
-    # Sort the words based on their TF-IDF scores in descending order
-    sorted_words = sorted(word_scores.items(), key=lambda x: x[1], reverse=True)
+    # bouton connection intermarché
+    intermarche_connection_button = "//button[@class='jow_prod__sc-fa79f5b3-2 hezbgj jow_prod__sc-7a4b48cb-2 hXUYpM']"
 
-    # Return the most important words
-    return [word for word, score in sorted_words[:num_words]]
+    driver.find_element("xpath", connection_button).click()
+    WebDriverWait(driver, 10).until(lambda x: x.find_element("xpath", intermarche))
+    driver.find_element("xpath", intermarche).click()
+    driver.find_element("xpath", accept_conditions).click()
+    driver.find_element("xpath", intermarche_connection_button).click()
+
+    # Wait for the new window to open (adjust the timeout as needed)
+    WebDriverWait(driver, 10).until(lambda instance: len(instance.window_handles) > 1)
+
+    # Switch to the new window handle
+    new_window_handle = [handle for handle in driver.window_handles if handle != driver.current_window_handle][0]
+    jow = driver.current_window_handle
+    driver.switch_to.window(new_window_handle)
+    WebDriverWait(driver, 10).until(lambda instance: instance.current_url != 'about:blank')
+
+    username = "//input[@id='username_display']"
+    password = "//input[@id='password']"
+    login = "//input[@id='kc-login']"
+
+    WebDriverWait(driver, 10).until(lambda x: x.find_element("xpath", username))
+
+    username_field = driver.find_element("xpath", username)
+    username_field.send_keys("")
+    password_field = driver.find_element("xpath", password)
+    password_field.send_keys("")
+
+    driver.find_element("xpath", login).click()
+    driver.switch_to.window(jow)
+    WebDriverWait(driver, 10).until(lambda x: len(x.window_handles) == 1)
+
+    # driver.close()
+    # driver.get(random_recipe)
+    add_to_menu(driver, random_recipe2)
+    add_to_menu(driver, random_recipe)
+    add_to_menu(driver, "https://jow.fr/recipes/soupe-pomme-butternut-88fy8qkz954hhii00krb")
+
+    driver.get("https://jow.fr/grocery/menu")
 
 
-# Example usage:
-"""tokens = ["natural", "language", "processing", "is", "important", "for", "understanding", "text", "data"]
-important_words = get_most_important_words(tokens, num_words=3)
-print(important_words)"""
+def add_to_menu(driver: webdriver.Firefox, recipe_url: str):
+    driver.get(recipe_url)
+    add_button = "//button[@class='jow_prod__sc-fa79f5b3-2 dKrja-D jow_prod__sc-fad4366c-2 hsurVL']"
+    driver.find_element("xpath", add_button).click()
+
+    add_anyway_button = "//button[@class='jow_prod__sc-111342c9-8 ixsifS']"
+
+    check_for_unavailability(driver, add_anyway_button)
+
+    # Attendre jusqu'à ce que le bouton "retirer du menu" apparaisse
+    withdraw_button = "//button[@class='jow_prod__sc-fa79f5b3-2 dKrja-D jow_prod__sc-fad4366c-2 jow_prod__sc-fad4366c-3 hsurVL Oaxam']"
+    WebDriverWait(driver, 10).until(lambda x: driver.find_element("xpath", withdraw_button))
 
 
-def standardize_synonyms_advanced(ingredient):
-    synonym_mapping = {
-        'all-purpose flour': 'flour',
-        'plain flour': 'flour',
-        'granulated sugar': 'sugar',
-        'unsalted butter': 'butter',
-        # Add more mappings as needed
-    }
+def check_for_unavailability(driver, element):
 
-    # Tokenize and stem the ingredient for more flexibility
-    tokens = word_tokenize(ingredient.lower(), language="french")
-    print(tokens)
-    stemmed_tokens = [SnowballStemmer("french").stem(token) for token in tokens]
-    print(stemmed_tokens)
-    ingredient_key = ' '.join(stemmed_tokens)
+    try:
+        # Use an explicit wait for the ingredient availability window
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, element)))
 
-    # Check if the standardized version exists in the mapping
-    standardized_ingredient = synonym_mapping.get(ingredient_key, ingredient)
+        # If the window is found, handle the case where ingredients are not available
+        print("Ingredients unavailability window found!")
+        # Add your logic to handle the case where ingredients are not available
+        driver.find_element(By.XPATH, element).click()
 
-    return standardized_ingredient
+    except TimeoutException:
+        return
+        # If the window is not found within the specified time, proceed with normal flow
+        # print("Ingredients unavailability window not found. Proceeding with normal flow.")
+        # Add your logic for the case where ingredients are available
+
+    except NoSuchElementException:
+        return
+        # Handle the case where the element is not found at all
+        # print("Element not found. Handle this case accordingly.")
+        # Add your logic for the case where the element is not found at all
+
+    # Continue with the rest of your script
 
 
-# Example usage
-ingredients = ['Bœuf (rôti)', 'Oignon jaune', 'Carotte (frais)', 'Bouillon de bœuf (cube)', 'Pommes de terre (primeur)',
-               'Thym (branches)', 'Farine de blé', 'Sauce Worcester']
-for ingredient in ingredients:
-    print(f"ingredient: {ingredient}, fun: {standardize_synonyms_advanced(ingredient)}")
-"""standardized_ingredient = standardize_synonyms_advanced(ingredient)
-print("Standardized Ingredient:", standardized_ingredient)"""
+# Example usage: update_shopping_cart(['https://recipe1.com', 'https://recipe2.com'])
+
+socle_ps5 = "https://www.amazon.fr/Station-refroidissement-console-manettes-emplacements/dp/B0CLV7KC8H/ref=sr_1_6?crid=QGRDS00K9O04&keywords=socle+ps5&qid=1704354706&sprefix=socle+p%2Caps%2C78&sr=8-6"
+
+random_recipe = "https://jow.fr/recipes/sandwich-thon-avocat-et-concombre-8spgeock7p1uf55q0fz2"
+random_recipe2 = "https://jow.fr/recipes/crousti-fajitas-8qfz4vk2dpjnjfto19v0?coversCount=3&from=menu"
+# add_to_cart(random_recipe)
+
+connection("https://jow.fr")
+

@@ -1,6 +1,8 @@
+from datetime import datetime
+
 from Miasm.mealPlan import MealPlan
-from Miasm.utils import *
 from Miasm.recipe import Recipe
+from Miasm.utils import *
 
 
 def get_final_recipes():
@@ -59,35 +61,38 @@ def get_final_recipes():
     recipes_final.to_csv("recipes_final.csv", header=True, sep=";", columns=recipes.columns)
 
 
+def main():
+    date_start = datetime.fromisoformat(str(input("Entrer la date de début du planning (format aaaa-mm-jj): ")))
+    date_end = datetime.fromisoformat(str(input("Entrer la date de fin du planning (format aaaa-mm-jj): ")))
+    ignore_weekends = input('Ignorer les week-ends (pas de plats le vendredi ni le samedi)? (y/n): ').lower().strip() == 'y'
+
+    print("\nChargement des recettes...")
+    df = reformat_df(pd.read_csv("recipes_final.csv", sep=";"))
+
+    recipes = list(map(lambda i: Recipe(df.iloc[i]), range(df.shape[0])))
+
+    print("\nGeneration d'un planning...")
+    plan = MealPlan(recipes, 60, season="hiver")
+    plan.generate(date_start, date_end, ignore_weekends)
+    filename = "mealplan_"+date_start.isoformat()[:7]+".ics"
+    print(f"\nGeneration d'un calendrier sous le nom: {filename}")
+    plan.to_ics(filename)
+    print("Calendrier créé!")
+
+    print("Génération du menu avec jow, pour la connexion à Intermarché: ")
+    username = str(input("Entrer l'email: "))
+    password = str(input("Entrer le mot de passe: "))
+
+    driver = connection("https://www.jow.fr", username, password)
+    print("Connection établie")
+    print("Ajout au menu des recettes...")
+
+    for meal in plan.meals:
+        add_to_menu(driver, meal.recipe.url)
+
+    driver.get("https://jow.fr/grocery/menu")
+
+
 if __name__ == "__main__":
-    df = pd.read_csv("recipes_final.csv", sep=";")
-    recipes = reformat_df(df)
-    current = Recipe(recipes.iloc[0])
-
-    l = list(map(lambda i: Recipe(recipes.iloc[i]), range(recipes.shape[0])))
-
-    print("\nHiver")
-    plan = MealPlan(l, 60, 22, season="hiver")
-    plan.generate("2024-01-03", "2024-01-10", ignore_weekends=True)
-    plan.to_ics("test.ics")
-    print(plan.price()*3)
-
-    # print("\nPrintemps")
-    # plan1 = MealPlan(l, 60, 22, season="printemps")
-    # plan1.generate("2024-01-03", "2024-01-10", ignore_weekends=True)
-    # plan1.to_ics("test.ics")
-    # print(plan1.price()*3)
-    #
-    # print("\nEte")
-    # plan2 = MealPlan(l, 60, 22, season="ete")
-    # plan2.generate("2024-01-03", "2024-01-10", ignore_weekends=True)
-    # plan2.to_ics("test.ics")
-    # print(plan2.price()*3)
-    #
-    # print("\nAutomne")
-    # plan3 = MealPlan(l, 60, 22, season="automne")
-    # plan3.generate("2024-01-03", "2024-01-10", ignore_weekends=True)
-    # plan3.to_ics("test.ics")
-    # print(plan3.price()*3)
-
+    main()
     pass
